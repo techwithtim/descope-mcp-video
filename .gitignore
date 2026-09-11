@@ -1,0 +1,6 @@
+.venv/
+notes.db
+.env
+__pycache__/
+.herenow/
+dist/

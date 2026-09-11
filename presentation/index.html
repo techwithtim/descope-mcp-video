@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP Servers Explained</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0E14;
+    --panel: #11151F;
+    --panel2: #151A26;
+    --line: #232B3D;
+    --text: #E6E1D6;
+    --muted: #8A92A6;
+    --amber: #FFB454;   /* model / client */
+    --teal: #5CCFE6;    /* user */
+    --green: #AAD94C;   /* server / tools */
+    --purple: #D2A6FF;  /* auth server */
+    --red: #F07178;
+    --display: "Space Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: var(--display); overflow: hidden; }
+  body::before {
+    content: ""; position: fixed; inset: 0;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 72px 72px; opacity: 0.18; pointer-events: none;
+  }
+  .slide { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; padding: 4vh 6vw; max-width: 1700px; margin: 0 auto; }
+  .slide.active { display: flex; animation: slidein 0.35s ease; }
+  @keyframes slidein { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .slide.active { animation: none; } .cursor { animation: none !important; } }
+
+  .eyebrow { font-family: var(--mono); font-size: clamp(12px, 1vw, 17px); letter-spacing: 0.22em; color: var(--amber); text-transform: uppercase; margin-bottom: 2.2vh; }
+  .eyebrow .dim { color: var(--muted); }
+  h1 { font-size: clamp(40px, 5.6vw, 96px); line-height: 1.04; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: clamp(30px, 3.6vw, 62px); line-height: 1.1; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 3.5vh; }
+  .sub { font-size: clamp(17px, 1.6vw, 28px); color: var(--muted); margin-top: 2.2vh; max-width: 60ch; }
+  .accent { color: var(--amber); } .tealc { color: var(--teal); } .greenc { color: var(--green); } .purplec { color: var(--purple); } .redc { color: var(--red); }
+
+  .punch { margin-top: 3.2vh; font-size: clamp(16px, 1.5vw, 26px); color: var(--text); border-left: 3px solid var(--amber); padding: 0.6em 1em; background: var(--panel); max-width: 75ch; }
+  .punch .m { color: var(--muted); }
+
+  .term { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; font-family: var(--mono); font-size: clamp(12px, 1.15vw, 20px); box-shadow: 0 24px 60px rgba(0,0,0,0.5); overflow: hidden; }
+  .term-bar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; background: var(--panel2); border-bottom: 1px solid var(--line); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+  .dot.r { background: #E96379; } .dot.y { background: #E5C07B; } .dot.g { background: #98C379; }
+  .term-title { font-size: 0.75em; color: var(--muted); margin-left: 8px; }
+  .term-body { padding: 1.1em 1.3em; line-height: 1.7; white-space: pre; overflow: auto; }
+  .kw { color: var(--amber); } .st { color: var(--green); } .fn { color: var(--teal); } .cm { color: var(--muted); font-style: italic; } .k { color: var(--purple); }
+
+  .cols { display: grid; gap: 3vw; align-items: start; }
+  .c2 { grid-template-columns: 1fr 1fr; }
+  .c2w { grid-template-columns: 1.25fr 1fr; }
+
+  .cards { display: grid; gap: 1.6vw; }
+  .cards.two { grid-template-columns: repeat(2, 1fr); }
+  .cards.three { grid-template-columns: repeat(3, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 2.2vh 1.6vw; }
+  .card .big { font-family: var(--mono); font-size: clamp(18px, 1.8vw, 32px); font-weight: 700; margin-bottom: 1vh; }
+  .card .huge { font-family: var(--mono); font-size: clamp(40px, 5vw, 92px); font-weight: 700; line-height: 1; margin-bottom: 1.2vh; }
+  .card p { color: var(--muted); font-size: clamp(14px, 1.2vw, 21px); line-height: 1.5; }
+  .card.warn { border-color: var(--red); } .card.good { border-color: var(--green); }
+  .badge { display: inline-block; font-family: var(--mono); font-size: 0.72em; padding: 0.2em 0.7em; border-radius: 999px; border: 1px solid var(--amber); color: var(--amber); margin-top: 1.2vh; }
+
+  .notes { display: flex; flex-direction: column; gap: 2vh; }
+  .note { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 8px; padding: 1.4vh 1.3vw; font-size: clamp(15px, 1.35vw, 24px); line-height: 1.5; }
+  .note b { color: var(--teal); font-weight: 500; }
+  .note.a { border-left-color: var(--amber); } .note.a b { color: var(--amber); }
+  .note.g { border-left-color: var(--green); } .note.g b { color: var(--green); }
+  .note.p { border-left-color: var(--purple); } .note.p b { color: var(--purple); }
+  .note.r { border-left-color: var(--red); } .note.r b { color: var(--red); }
+
+  .btnrow { display: flex; gap: 1vw; margin-top: 2.2vh; align-items: center; }
+  button.ctrl { font-family: var(--mono); font-size: clamp(14px, 1.2vw, 21px); font-weight: 700; background: var(--amber); color: #14100A; border: none; border-radius: 8px; padding: 0.6em 1.5em; cursor: pointer; }
+  button.ctrl:hover { filter: brightness(1.1); }
+  button.ctrl:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  button.ctrl.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .statline { font-family: var(--mono); color: var(--muted); font-size: clamp(13px, 1.1vw, 19px); }
+  .statline b { color: var(--amber); font-weight: 700; }
+
+  .stages { display: flex; flex-direction: column; gap: 1.1vh; }
+  .stage { display: flex; align-items: center; gap: 1vw; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 1.2vh 1.2vw; font-size: clamp(14px, 1.3vw, 23px); transition: border-color 0.25s, background 0.25s; }
+  .stage .n { font-family: var(--mono); color: var(--muted); font-size: 0.8em; width: 2.2em; flex-shrink: 0; }
+  .stage .d { color: var(--muted); font-size: 0.72em; display: block; margin-top: 0.2em; }
+  .stage.lit { border-color: var(--amber); background: #1A1610; box-shadow: 0 0 0 1px var(--amber); }
+  .stage.lit .n { color: var(--amber); }
+  .stage.lit.p { border-color: var(--purple); background: #17121F; box-shadow: 0 0 0 1px var(--purple); } .stage.lit.p .n { color: var(--purple); }
+  .stage.lit.r { border-color: var(--red); background: #1F1214; box-shadow: 0 0 0 1px var(--red); } .stage.lit.r .n { color: var(--red); }
+  .stage.lit.g { border-color: var(--green); background: #141A0F; box-shadow: 0 0 0 1px var(--green); } .stage.lit.g .n { color: var(--green); }
+
+  /* plug diagram */
+  .diagram { display: flex; align-items: center; justify-content: center; gap: 4vw; min-height: 46vh; }
+  .hub { width: clamp(150px, 14vw, 240px); height: clamp(150px, 14vw, 240px); border-radius: 50%; border: 2px solid var(--amber); background: #1A1610; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: clamp(18px, 1.8vw, 32px); text-align: center; box-shadow: 0 0 60px rgba(255,180,84,0.15); flex-shrink: 0; }
+  .apps { display: flex; flex-direction: column; gap: 2vh; }
+  .app { display: flex; align-items: center; gap: 1vw; }
+  .app .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1.2vh 1.4vw; font-family: var(--mono); font-size: clamp(14px, 1.3vw, 23px); min-width: 9em; text-align: center; }
+  .wire { height: 3px; width: clamp(60px, 7vw, 130px); border-radius: 3px; }
+  .wire.w1 { background: var(--teal); } .wire.w2 { background: var(--green); border-top: 2px dashed var(--bg); } .wire.w3 { background: var(--purple); } .wire.w4 { background: var(--red); }
+  .wire.same { background: var(--amber); }
+  .stack { display: flex; flex-direction: column; gap: 2vh; }
+  .srv { background: var(--panel); border: 1px solid var(--green); border-radius: 10px; padding: 1.4vh 1.6vw; font-family: var(--mono); font-size: clamp(14px, 1.3vw, 23px); color: var(--green); text-align: center; }
+
+  /* three boxes actor row */
+  .actors { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2vw; margin-bottom: 2.5vh; }
+  .actor { border: 1px solid var(--line); border-radius: 12px; padding: 1.6vh 1.2vw; text-align: center; background: var(--panel); font-weight: 700; font-size: clamp(16px, 1.5vw, 26px); }
+  .actor small { display: block; font-family: var(--mono); font-weight: 400; color: var(--muted); font-size: 0.62em; margin-top: 0.4em; }
+  .actor.a { border-color: var(--amber); color: var(--amber); } .actor.g { border-color: var(--green); color: var(--green); } .actor.p { border-color: var(--purple); color: var(--purple); }
+  .actor.on { box-shadow: 0 0 0 2px currentColor, 0 0 40px rgba(255,255,255,0.08); }
+
+  table.cmp { border-collapse: collapse; width: 100%; font-size: clamp(15px, 1.4vw, 25px); }
+  table.cmp th, table.cmp td { text-align: left; padding: 1.5vh 1.4vw; border-bottom: 1px solid var(--line); line-height: 1.45; }
+  table.cmp th { font-family: var(--mono); font-size: 0.75em; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  table.cmp td .ok { color: var(--green); font-family: var(--mono); margin-right: 0.5em; }
+  table.cmp td .no { color: var(--red); font-family: var(--mono); margin-right: 0.5em; }
+
+  .qs { display: flex; flex-direction: column; gap: 2.2vh; }
+  .q { font-size: clamp(26px, 3vw, 54px); font-weight: 700; letter-spacing: -0.01em; display: flex; gap: 0.6em; align-items: baseline; }
+  .q .n { font-family: var(--mono); color: var(--muted); font-size: 0.5em; }
+
+  .navbar { position: fixed; bottom: 22px; right: 30px; display: flex; align-items: center; gap: 16px; font-family: var(--mono); color: var(--muted); font-size: 15px; z-index: 10; }
+  .navbar .counter b { color: var(--amber); }
+  .navbtn { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; width: 40px; height: 40px; font-size: 18px; cursor: pointer; }
+  .navbtn:hover { border-color: var(--amber); }
+  .dots { position: fixed; bottom: 30px; left: 30px; display: flex; gap: 7px; z-index: 10; }
+  .pdot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); cursor: pointer; }
+  .pdot.on { background: var(--amber); }
+  .foot { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 13px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.7; }
+</style>
+</head>
+<body>
+
+<!-- 1 TITLE -->
+<section class="slide">
+  <div class="eyebrow">MCP servers <span class="dim">/ explained, then built</span></div>
+  <h1>What the f*** is an<br><span class="accent">MCP server?</span></h1>
+  <p class="sub">A program that gives an AI model a list of functions it's allowed to call. That's pretty much it.</p>
+  <div class="punch">By the end: one you built, on the internet, with a real <span class="accent">login screen</span> Claude and Cursor can sign into.</div>
+</section>
+
+<!-- 2 MODEL CAN'T DO ANYTHING -->
+<section class="slide">
+  <div class="eyebrow">01 <span class="dim">/ the model on its own</span></div>
+  <h2>A language model can't <span class="redc">do</span> anything</h2>
+  <div class="cols c2w">
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">model</span></div>
+      <div class="term-body"><span class="kw">text in</span>  →  [ model ]  →  <span class="kw">text out</span>
+
+<span class="cm"># can't read your files
+# can't check your calendar
+# can't query your database
+# can't send a Slack message</span></div>
+    </div>
+    <div class="notes">
+      <div class="note a"><b>So you give it tools.</b> A tool is just a function with a name, a description and some parameters.</div>
+      <div class="note g"><b>The model never runs it.</b> It replies "call this one, with these arguments." Your code runs it and sends the result back.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 THE TOOL LOOP (interactive) -->
+<section class="slide">
+  <div class="eyebrow">02 <span class="dim">/ how a tool call works</span></div>
+  <h2>The whole thing is four steps</h2>
+  <div class="cols c2w">
+    <div class="stages" id="loop">
+      <div class="stage"><span class="n">1</span><div>Model reads the tool list<span class="d">names, descriptions, parameters</span></div></div>
+      <div class="stage"><span class="n">2</span><div>Model decides "I need this one"<span class="d">replies with the function name + arguments as JSON</span></div></div>
+      <div class="stage"><span class="n">3</span><div>Your code runs the function<span class="d">the model is not involved here at all</span></div></div>
+      <div class="stage"><span class="n">4</span><div>Result goes back to the model<span class="d">it reads it and writes the answer, or calls another tool</span></div></div>
+    </div>
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">what actually goes over the wire</span></div>
+      <div class="term-body" id="loopterm"><span class="cm"># press Step</span></div>
+    </div>
+  </div>
+  <div class="btnrow">
+    <button class="ctrl" onclick="loopStep()">Step</button>
+    <button class="ctrl ghost" onclick="loopReset()">Reset</button>
+  </div>
+</section>
+
+<!-- 4 BEFORE MCP -->
+<section class="slide">
+  <div class="eyebrow">03 <span class="dim">/ the problem MCP solves</span></div>
+  <h2>Before MCP: everyone rebuilt the same plumbing</h2>
+  <div class="diagram">
+    <div class="apps">
+      <div class="app"><div class="box">Claude</div><div class="wire w1"></div></div>
+      <div class="app"><div class="box">Cursor</div><div class="wire w2"></div></div>
+      <div class="app"><div class="box">ChatGPT</div><div class="wire w3"></div></div>
+      <div class="app"><div class="box">your app</div><div class="wire w4"></div></div>
+    </div>
+    <div class="hub">your<br>GitHub<br>tools</div>
+  </div>
+  <p class="sub" style="text-align:center; max-width:none;">Four apps, four different integrations, for the exact same functions.</p>
+</section>
+
+<!-- 5 MCP -->
+<section class="slide">
+  <div class="eyebrow">03 <span class="dim">/ the problem MCP solves</span></div>
+  <h2><span class="accent">MCP</span> is just a standard for that plug</h2>
+  <div class="diagram">
+    <div class="apps">
+      <div class="app"><div class="box">Claude</div><div class="wire same"></div></div>
+      <div class="app"><div class="box">Cursor</div><div class="wire same"></div></div>
+      <div class="app"><div class="box">ChatGPT</div><div class="wire same"></div></div>
+      <div class="app"><div class="box">your app</div><div class="wire same"></div></div>
+    </div>
+    <div class="hub">MCP<br>server</div>
+    <div class="stack">
+      <div class="srv">list_repos()</div>
+      <div class="srv">create_issue()</div>
+      <div class="srv">search_code()</div>
+    </div>
+  </div>
+  <p class="sub" style="text-align:center; max-width:none;">Model Context Protocol. Write the tools once, every app that speaks MCP can use them. The USB-C of AI tools.</p>
+</section>
+
+<!-- 6 CLIENT VS SERVER -->
+<section class="slide">
+  <div class="eyebrow">04 <span class="dim">/ two sides</span></div>
+  <h2>Client asks, server answers. It's all JSON.</h2>
+  <div class="actors">
+    <div class="actor a">MCP client<small>Claude, Cursor, VS Code, ChatGPT</small></div>
+    <div class="actor" style="border:none;background:none;color:var(--muted);font-family:var(--mono);font-weight:400;">tools/list  →<br>←  tools/call</div>
+    <div class="actor g">MCP server<small>your code, your functions</small></div>
+  </div>
+  <div class="cols c2">
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">client → server</span></div>
+      <div class="term-body">{ <span class="k">"method"</span>: <span class="st">"tools/list"</span> }
+
+{ <span class="k">"method"</span>: <span class="st">"tools/call"</span>,
+  <span class="k">"params"</span>: {
+    <span class="k">"name"</span>: <span class="st">"add_a_note"</span>,
+    <span class="k">"arguments"</span>: { <span class="k">"text"</span>: <span class="st">"buy milk"</span> }
+  } }</div>
+    </div>
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">server → client</span></div>
+      <div class="term-body">{ <span class="k">"tools"</span>: [
+    { <span class="k">"name"</span>: <span class="st">"list_my_notes"</span>, <span class="k">"description"</span>: <span class="st">"List all saved notes."</span> },
+    { <span class="k">"name"</span>: <span class="st">"add_a_note"</span>,   <span class="k">"description"</span>: <span class="st">"Save a new note."</span> },
+    { <span class="k">"name"</span>: <span class="st">"delete_a_note"</span>, ... } ] }
+
+{ <span class="k">"content"</span>: [ { <span class="k">"text"</span>: <span class="st">"{\"id\": 1, \"text\": \"buy milk\"}"</span> } ] }</div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 LOCAL VS REMOTE -->
+<section class="slide">
+  <div class="eyebrow">05 <span class="dim">/ two ways to run one</span></div>
+  <h2>Local vs remote</h2>
+  <div class="cards two">
+    <div class="card">
+      <div class="big tealc">local  ·  stdio</div>
+      <p>The client launches your server as a subprocess and pipes JSON through stdin / stdout.</p>
+      <p style="margin-top:1vh;"><span class="fn" style="font-family:var(--mono)">python my_server.py</span></p>
+      <p style="margin-top:1vh;">Only on your machine. Nobody else can touch it. What 90% of tutorials show.</p>
+    </div>
+    <div class="card">
+      <div class="big greenc">remote  ·  HTTP</div>
+      <p>Your server runs somewhere on the internet. It has a URL. Clients connect over HTTP.</p>
+      <p style="margin-top:1vh;"><span class="fn" style="font-family:var(--mono)">https://notes.example.com/mcp</span></p>
+      <p style="margin-top:1vh;">How every real product does it. GitHub, Notion, Stripe. Works from your laptop, phone, work machine.</p>
+    </div>
+  </div>
+  <div class="punch">The moment your server is a URL, you have a problem the local version never had.</div>
+</section>
+
+<!-- 8 THREE QUESTIONS -->
+<section class="slide">
+  <div class="eyebrow">06 <span class="dim">/ access control</span></div>
+  <h2>Anyone with the URL can call your tools</h2>
+  <p class="sub" style="margin-top:0; margin-bottom:4vh;">Your tools read data, write data, delete data. So every request now needs three answers.</p>
+  <div class="qs">
+    <div class="q"><span class="n">01</span><span>Who is calling this?</span></div>
+    <div class="q"><span class="n">02</span><span>What are they <span class="accent">allowed</span> to do?</span></div>
+    <div class="q"><span class="n">03</span><span>Who are they doing it <span class="tealc">on behalf of</span>?</span></div>
+  </div>
+</section>
+
+<!-- 9 STATS -->
+<section class="slide">
+  <div class="eyebrow">06 <span class="dim">/ access control</span></div>
+  <h2>How it's going out there</h2>
+  <div class="cards three">
+    <div class="card warn">
+      <div class="huge redc">~25%</div>
+      <p>of public MCP servers have <b>no authentication at all</b></p>
+    </div>
+    <div class="card warn">
+      <div class="huge accent">most</div>
+      <p>of the rest use a <b>static API key</b>. One long-lived secret in a config file, shared by everyone.</p>
+    </div>
+    <div class="card good">
+      <div class="huge greenc">few</div>
+      <p>actually use proper <b>OAuth</b>, which is what the MCP spec says a remote server should do.</p>
+    </div>
+  </div>
+  <p class="statline" style="margin-top:3vh;">2026 audits of public MCP servers. Rough numbers, the shape is what matters.</p>
+</section>
+
+<!-- 10 ONE KEY FIVE AGENTS -->
+<section class="slide">
+  <div class="eyebrow">06 <span class="dim">/ access control</span></div>
+  <h2>Why a static key is a problem</h2>
+  <div class="diagram" style="min-height:38vh;">
+    <div class="apps">
+      <div class="app"><div class="box">agent 1</div><div class="wire w4"></div></div>
+      <div class="app"><div class="box">agent 2</div><div class="wire w4"></div></div>
+      <div class="app"><div class="box">agent 3</div><div class="wire w4"></div></div>
+      <div class="app"><div class="box">agent 4</div><div class="wire w4"></div></div>
+      <div class="app"><div class="box">agent 5</div><div class="wire w4"></div></div>
+    </div>
+    <div class="hub" style="border-color:var(--red); background:#1F1214; box-shadow:none;"><span style="font-family:var(--mono); font-size:0.8em;">API_KEY=<br>sk-a83f...</span></div>
+    <div class="notes" style="max-width:34vw;">
+      <div class="note r"><b>Which one is which?</b> Same key, so you can't tell the agents apart.</div>
+      <div class="note r"><b>Who told it to do that?</b> No user attached to any request.</div>
+      <div class="note r"><b>One gets compromised?</b> Kill the key, break everybody.</div>
+    </div>
+  </div>
+  <div class="punch">Fine for a weekend project. Not fine for anything real.</div>
+</section>
+
+<!-- 11 THE 401 DANCE (interactive) -->
+<section class="slide">
+  <div class="eyebrow">07 <span class="dim">/ what the spec says: OAuth 2.1</span></div>
+  <h2>Your MCP server does <span class="accent">not</span> do login</h2>
+  <div class="actors" id="danceActors">
+    <div class="actor a" data-a="client">Claude / Cursor<small>MCP client</small></div>
+    <div class="actor g" data-a="server">Your MCP server<small>just validates tokens</small></div>
+    <div class="actor p" data-a="auth">Authorization server<small>login, consent, tokens</small></div>
+  </div>
+  <div class="stages" id="dance">
+    <div class="stage" data-c="r"><span class="n">1</span><div>Claude calls your server with no token<span class="d">server replies 401 + "here is where you go to log in"</span></div></div>
+    <div class="stage" data-c="p"><span class="n">2</span><div>User logs in at the authorization server<span class="d">Google, email, whatever. Normal login screen.</span></div></div>
+    <div class="stage" data-c="p"><span class="n">3</span><div>User sees a consent screen<span class="d">"Claude wants to read your notes and create notes. Allow?"</span></div></div>
+    <div class="stage" data-c="a"><span class="n">4</span><div>Claude gets a token, sends it with every request<span class="d">Authorization: Bearer eyJ...</span></div></div>
+    <div class="stage" data-c="g"><span class="n">5</span><div>Your server checks the token, then runs the tool<span class="d">signature, meant for this server, has the right scopes</span></div></div>
+  </div>
+  <div class="btnrow">
+    <button class="ctrl" onclick="danceStep()">Step</button>
+    <button class="ctrl ghost" onclick="danceReset()">Reset</button>
+    <span class="statline" id="dancestat"></span>
+  </div>
+</section>
+
+<!-- 12 SCOPES + IDENTITY -->
+<section class="slide">
+  <div class="eyebrow">08 <span class="dim">/ what's inside the token</span></div>
+  <h2>Scopes say what. <span class="tealc">sub</span> says who.</h2>
+  <div class="cols c2w">
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">access token (decoded)</span></div>
+      <div class="term-body">{
+  <span class="k">"sub"</span>:   <span class="st">"U2abc..."</span>,        <span class="cm">← the user</span>
+  <span class="k">"aud"</span>:   <span class="st">"https://notes.example.com/mcp"</span>,  <span class="cm">← YOUR server only</span>
+  <span class="k">"scope"</span>: <span class="st">"notes:read notes:write"</span>,  <span class="cm">← what they approved</span>
+  <span class="k">"azp"</span>:   <span class="st">"cursor-7f3a"</span>,     <span class="cm">← which client (agent)</span>
+  <span class="k">"exp"</span>:   <span class="st">1757450000</span>         <span class="cm">← short-lived</span>
+}</div>
+    </div>
+    <div class="notes">
+      <div class="note a"><b>Per-tool permissions.</b> list_my_notes needs notes:read, delete_a_note needs notes:write. Only approved read? Write fails cleanly and the client can ask for more.</div>
+      <div class="note"><b>Per-user data.</b> Every call has a user id, so notes are stored per user with one line of code.</div>
+      <div class="note g"><b>Revoke one thing.</b> One user, one agent, without touching anyone else. That's the difference between a demo and a product.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 DCR -->
+<section class="slide">
+  <div class="eyebrow">09 <span class="dim">/ one more piece</span></div>
+  <h2>Clients register themselves</h2>
+  <div class="cols c2">
+    <div class="notes">
+      <div class="note a"><b>Dynamic client registration.</b> Claude, Cursor and VS Code tell the authorization server "hi, I'm a client, here's where to send the user back" and get an id automatically.</div>
+      <div class="note"><b>You never set up Claude as an app by hand.</b> Paste a URL into the client, the rest just happens.</div>
+    </div>
+    <div class="term">
+      <div class="term-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="term-title">what Cursor does when you paste the URL</span></div>
+      <div class="term-body">POST /mcp                         <span class="cm">→ 401</span>
+GET  /.well-known/oauth-protected-resource
+GET  /.well-known/oauth-authorization-server
+POST /register                    <span class="cm">→ client_id</span>
+<span class="cm"># browser opens: login → consent</span>
+POST /token                       <span class="cm">→ access_token</span>
+POST /mcp  Authorization: Bearer  <span class="cm">→ 200</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 14 BUILD IT YOURSELF? -->
+<section class="slide">
+  <div class="eyebrow">10 <span class="dim">/ so who builds all that</span></div>
+  <h2>You <span class="redc">could</span> build the authorization server yourself</h2>
+  <table class="cmp">
+    <tr><th>You'd need</th><th>Do it yourself</th><th>Plug one in</th></tr>
+    <tr><td>Login page + consent screen</td><td><span class="no">✗</span>weeks</td><td><span class="ok">✓</span>config</td></tr>
+    <tr><td>Token signing, expiry, refresh</td><td><span class="no">✗</span>get it wrong once, game over</td><td><span class="ok">✓</span>done</td></tr>
+    <tr><td>Dynamic client registration</td><td><span class="no">✗</span>spec reading</td><td><span class="ok">✓</span>toggle</td></tr>
+    <tr><td>Scopes per tool, per user</td><td><span class="no">✗</span>your own policy engine</td><td><span class="ok">✓</span>dashboard</td></tr>
+    <tr><td>See who connected, revoke one</td><td><span class="no">✗</span>build an admin panel</td><td><span class="ok">✓</span>dashboard</td></tr>
+  </table>
+  <div class="punch">We're going to plug one in. But first, let's build the server.</div>
+</section>
+
+<!-- 15 ROADMAP -->
+<section class="slide">
+  <div class="eyebrow">let's build it</div>
+  <h2>Three versions, same three tools</h2>
+  <div class="cards three">
+    <div class="card">
+      <div class="big tealc">v1  ·  local</div>
+      <p>FastMCP, stdio, three tools over SQLite. Add it to Cursor. Watch the tool calls.</p>
+      <span class="badge">15 lines</span>
+    </div>
+    <div class="card">
+      <div class="big greenc">v2  ·  remote</div>
+      <p>One line change: it's a URL now. Then hit it from another terminal with zero login.</p>
+      <span class="badge">the problem</span>
+    </div>
+    <div class="card">
+      <div class="big purplec">v3  ·  protected</div>
+      <p>The 401 dance for real. Login, consent, scopes, per-user notes. Claude and Cursor sign in.</p>
+      <span class="badge">the fix</span>
+    </div>
+  </div>
+</section>
+
+<div class="dots" id="dots"></div>
+<div class="foot">← → to move · F fullscreen</div>
+<div class="navbar">
+  <button class="navbtn" onclick="go(-1)">‹</button>
+  <span class="counter"><b id="cur">01</b> / <span id="tot">00</span></span>
+  <button class="navbtn" onclick="go(1)">›</button>
+</div>
+
+<script>
+const slides = document.querySelectorAll('.slide');
+let idx = 0;
+const dotsEl = document.getElementById('dots');
+slides.forEach((_, i) => { const d = document.createElement('div'); d.className = 'pdot'; d.onclick = () => show(i); dotsEl.appendChild(d); });
+function show(i) {
+  idx = Math.max(0, Math.min(slides.length - 1, i));
+  slides.forEach((s, j) => s.classList.toggle('active', j === idx));
+  document.querySelectorAll('.pdot').forEach((d, j) => d.classList.toggle('on', j === idx));
+  document.getElementById('cur').textContent = String(idx + 1).padStart(2, '0');
+}
+function go(d) { show(idx + d); }
+document.getElementById('tot').textContent = String(slides.length).padStart(2, '0');
+show(0);
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'BUTTON' && e.key === ' ') return;
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); go(1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1); }
+  else if (e.key === 'Home') show(0);
+  else if (e.key === 'End') show(slides.length - 1);
+  else if (e.key.toLowerCase() === 'f') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+});
+
+// slide 3: tool loop
+const loopWire = [
+  '<span class="cm"># 1. client → model</span>\ntools: [ list_my_notes, add_a_note, delete_a_note ]\nuser: "remind me to buy milk"',
+  '<span class="cm"># 2. model → client</span>\n{ <span class="k">"tool"</span>: <span class="st">"add_a_note"</span>,\n  <span class="k">"arguments"</span>: { <span class="k">"text"</span>: <span class="st">"buy milk"</span> } }',
+  '<span class="cm"># 3. your code</span>\n<span class="fn">add_a_note</span>(text=<span class="st">"buy milk"</span>)\n<span class="cm"># INSERT INTO notes ...</span>',
+  '<span class="cm"># 4. result → model</span>\n{ <span class="k">"id"</span>: 1, <span class="k">"text"</span>: <span class="st">"buy milk"</span> }\n\nmodel: "Done, I saved a note: buy milk."',
+];
+let loopI = -1;
+function loopStep() {
+  loopI = (loopI + 1) % loopWire.length;
+  document.querySelectorAll('#loop .stage').forEach((s, i) => s.classList.toggle('lit', i === loopI));
+  document.getElementById('loopterm').innerHTML = loopWire[loopI];
+}
+function loopReset() { loopI = -1; document.querySelectorAll('#loop .stage').forEach(s => s.classList.remove('lit')); document.getElementById('loopterm').innerHTML = '<span class="cm"># press Step</span>'; }
+
+// slide 11: the 401 dance
+const danceActor = ['server', 'auth', 'auth', 'client', 'server'];
+const danceStat = ['HTTP 401 · WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource"', 'browser opens · user signs in', 'consent: notes:read, notes:write', 'Authorization: Bearer eyJhbGciOi…', 'HTTP 200 · tool ran'];
+let danceI = -1;
+function danceStep() {
+  danceI = (danceI + 1) % danceActor.length;
+  document.querySelectorAll('#dance .stage').forEach((s, i) => { s.classList.remove('lit', 'r', 'p', 'a', 'g'); if (i === danceI) s.classList.add('lit', s.dataset.c); });
+  document.querySelectorAll('#danceActors .actor').forEach(a => a.classList.toggle('on', a.dataset.a === danceActor[danceI]));
+  document.getElementById('dancestat').textContent = danceStat[danceI];
+}
+function danceReset() { danceI = -1; document.querySelectorAll('#dance .stage').forEach(s => s.classList.remove('lit', 'r', 'p', 'a', 'g')); document.querySelectorAll('#danceActors .actor').forEach(a => a.classList.remove('on')); document.getElementById('dancestat').textContent = ''; }
+</script>
+</body>
+</html>

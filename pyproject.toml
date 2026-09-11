@@ -1,0 +1,12 @@
+[project]
+name = "descope-mcp-video"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "descope-mcp>=0.1.0",
+    "fastmcp<4",
+    "httpx>=0.28.1",
+    "mcp<2",
+    "python-dotenv>=1.2.3",
+]
